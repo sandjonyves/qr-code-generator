@@ -1,103 +1,153 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
+import QRCodeGenerator from '@/components/QRCodeGenerator';
+import QRCodeDisplay from '@/components/QRCodeDisplay';
+import QRCodeHistory from '@/components/QRCodeHistory';
+import ThemeToggle from '@/components/ThemeToggle';
+
+interface QRCodeData {
+  text: string;
+  fgColor: string;
+  bgColor: string;
+  timestamp: number;
+}
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [qrCode, setQrCode] = useState<QRCodeData | null>(null);
+  const [history, setHistory] = useState<QRCodeData[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const handleGenerate = async (data: QRCodeData) => {
+    setIsGenerating(true);
+    try {
+      const newQRCode = { ...data, timestamp: Date.now() };
+      setQrCode(newQRCode);
+      setHistory(prev => [newQRCode, ...prev]);
+      toast.success('QR Code généré avec succès !');
+    } catch (error) {
+      toast.error('Erreur lors de la génération du QR Code');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleDownload = async (data: QRCodeData, format: 'png' | 'svg') => {
+    try {
+      // On utilise un ID unique pour cibler le bon SVG
+      const svgId = `qr-code-${data.timestamp}`;
+      const svgElement = document.getElementById(svgId)?.querySelector('svg');
+      if (!svgElement) throw new Error('SVG not found');
+
+      if (format === 'svg') {
+        // Pour le format SVG, on télécharge directement le SVG
+        const svgData = new XMLSerializer().serializeToString(svgElement);
+        const blob = new Blob([svgData], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `qrcode-${Date.now()}.svg`;
+        link.click();
+        URL.revokeObjectURL(url);
+      } else {
+        // Pour le format PNG, on convertit le SVG en PNG
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Context not found');
+
+        // Définir une taille fixe pour le canvas
+        const size = 512; // Taille plus grande pour une meilleure qualité
+        canvas.width = size;
+        canvas.height = size;
+
+        // Créer une image à partir du SVG
+        const svgData = new XMLSerializer().serializeToString(svgElement);
+        const svgBlob = new Blob([svgData], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(svgBlob);
+        const img = new Image();
+
+        img.onload = () => {
+          // Fond avec la couleur spécifiée
+          ctx.fillStyle = data.bgColor;
+          ctx.fillRect(0, 0, size, size);
+          
+          // Dessiner le QR code
+          ctx.drawImage(img, 0, 0, size, size);
+
+          // Télécharger le PNG
+          const link = document.createElement('a');
+          link.download = `qrcode-${Date.now()}.png`;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+          URL.revokeObjectURL(url);
+        };
+
+        img.src = url;
+      }
+      toast.success(`QR Code téléchargé en ${format.toUpperCase()} !`);
+    } catch (error) {
+      console.error('Erreur lors du téléchargement:', error);
+      toast.error('Erreur lors du téléchargement');
+    }
+  };
+
+  const handleShare = async (data: QRCodeData) => {
+    try {
+      if (navigator.share) {
+        const shareData = {
+          title: 'Mon QR Code',
+          text: `QR Code pour: ${data.text}`,
+          url: data.text.startsWith('http') ? data.text : undefined,
+        };
+
+        await navigator.share(shareData);
+        toast.success('QR Code partagé avec succès !');
+      } else {
+        // Fallback pour les navigateurs qui ne supportent pas l'API Share
+        const textArea = document.createElement('textarea');
+        textArea.value = data.text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        toast.success('Lien copié dans le presse-papier !');
+      }
+    } catch (error) {
+      if ((error as Error).name !== 'AbortError') {
+        console.error('Erreur lors du partage:', error);
+        toast.error('Erreur lors du partage');
+      }
+    }
+  };
+
+  return (
+    <main className="min-h-screen p-4 md:p-8 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+            Générateur de QR Code
+          </h1>
+          <ThemeToggle />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+
+        <QRCodeGenerator onGenerate={handleGenerate} isGenerating={isGenerating} />
+
+        {qrCode && (
+          <QRCodeDisplay
+            qrCode={qrCode}
+            onDownload={handleDownload}
+            onShare={handleShare}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+        )}
+
+        <QRCodeHistory
+          history={history}
+          onDownload={handleDownload}
+          onShare={handleShare}
+        />
+      </div>
+      <Toaster position="bottom-right" />
+    </main>
   );
 }
