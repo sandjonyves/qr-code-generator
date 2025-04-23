@@ -1,159 +1,78 @@
 'use client';
 
-import { useState } from 'react';
-import toast, { Toaster } from 'react-hot-toast';
-import QRCodeGenerator from '@/components/QRCodeGenerator';
-import QRCodeDisplay from '@/components/QRCodeDisplay';
-import QRCodeHistory from '@/components/QRCodeHistory';
-import ThemeToggle from '@/components/ThemeToggle';
-import ScanButton from '@/components/ScanButton';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import dynamic from 'next/dynamic';
+import { QrCodeIcon, ViewfinderCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
 
-interface QRCodeData {
-  text: string;
-  fgColor: string;
-  bgColor: string;
-  timestamp: number;
-}
+// Import dynamique du composant Background3D pour éviter les problèmes de SSR
+const Background3D = dynamic(() => import('@/components/Background3D'), {
+  ssr: false,
+  loading: () => (
+    <div className="fixed inset-0 bg-gradient-to-br from-indigo-900 to-purple-900" />
+  ),
+});
 
 export default function Home() {
-  const [qrCode, setQrCode] = useState<QRCodeData | null>(null);
-  const [history, setHistory] = useState<QRCodeData[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  const handleGenerate = async (data: QRCodeData) => {
-    setIsGenerating(true);
-    try {
-      const newQRCode = { ...data, timestamp: Date.now() };
-      setQrCode(newQRCode);
-      setHistory(prev => [newQRCode, ...prev]);
-      toast.success('QR Code généré avec succès !');
-    } catch (error) {
-      toast.error('Erreur lors de la génération du QR Code');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleDownload = async (data: QRCodeData, format: 'png' | 'svg') => {
-    try {
-      // On utilise un ID unique pour cibler le bon SVG
-      const svgId = `qr-code-${data.timestamp}`;
-      const svgElement = document.getElementById(svgId)?.querySelector('svg');
-      if (!svgElement) throw new Error('SVG not found');
-
-      if (format === 'svg') {
-        // Pour le format SVG, on télécharge directement le SVG
-        const svgData = new XMLSerializer().serializeToString(svgElement);
-        const blob = new Blob([svgData], { type: 'image/svg+xml' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `qrcode-${Date.now()}.svg`;
-        link.click();
-        URL.revokeObjectURL(url);
-      } else {
-        // Pour le format PNG, on convertit le SVG en PNG
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error('Context not found');
-
-        // Définir une taille fixe pour le canvas
-        const size = 512; // Taille plus grande pour une meilleure qualité
-        canvas.width = size;
-        canvas.height = size;
-
-        // Créer une image à partir du SVG
-        const svgData = new XMLSerializer().serializeToString(svgElement);
-        const svgBlob = new Blob([svgData], { type: 'image/svg+xml' });
-        const url = URL.createObjectURL(svgBlob);
-        const img = new Image();
-
-        img.onload = () => {
-          // Fond avec la couleur spécifiée
-          ctx.fillStyle = data.bgColor;
-          ctx.fillRect(0, 0, size, size);
-          
-          // Dessiner le QR code
-          ctx.drawImage(img, 0, 0, size, size);
-
-          // Télécharger le PNG
-          const link = document.createElement('a');
-          link.download = `qrcode-${Date.now()}.png`;
-          link.href = canvas.toDataURL('image/png');
-          link.click();
-          URL.revokeObjectURL(url);
-        };
-
-        img.src = url;
-      }
-      toast.success(`QR Code téléchargé en ${format.toUpperCase()} !`);
-    } catch (error) {
-      console.error('Erreur lors du téléchargement:', error);
-      toast.error('Erreur lors du téléchargement');
-    }
-  };
-
-  const handleShare = async (data: QRCodeData) => {
-    try {
-      if (navigator.share) {
-        const shareData = {
-          title: 'Mon QR Code',
-          text: `QR Code pour: ${data.text}`,
-          url: data.text.startsWith('http') ? data.text : undefined,
-        };
-
-        await navigator.share(shareData);
-        toast.success('QR Code partagé avec succès !');
-      } else {
-        // Fallback pour les navigateurs qui ne supportent pas l'API Share
-        const textArea = document.createElement('textarea');
-        textArea.value = data.text;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        toast.success('Lien copié dans le presse-papier !');
-      }
-    } catch (error) {
-      if ((error as Error).name !== 'AbortError') {
-        console.error('Erreur lors du partage:', error);
-        toast.error('Erreur lors du partage');
-      }
-    }
-  };
+  const router = useRouter();
 
   return (
-    <main className="min-h-screen p-4 md:p-8 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-              Générateur de QR Code
-            </h1>
-            
-          </div>
-          <ThemeToggle />
+    <main className="relative min-h-screen overflow-hidden">
+      {/* Fond 3D */}
+      <Background3D />
+
+      {/* Contenu principal */}
+      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4">
+        {/* En-tête */}
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
+            QR Code Generator
+          </h1>
+          <p className="text-lg md:text-xl text-gray-200">
+            Générez et scannez vos QR codes en toute simplicité
+          </p>
         </div>
 
-        <QRCodeGenerator onGenerate={handleGenerate} isGenerating={isGenerating} />
+        {/* Boutons principaux */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl w-full">
+          <Link
+            href="/generate"
+            className="group relative bg-white/10 hover:bg-white/20 backdrop-blur-lg rounded-2xl p-6 transition-all duration-300 border border-white/20 hover:border-white/40"
+          >
+            <div className="flex flex-col items-center gap-4">
+              <QrCodeIcon className="w-16 h-16 text-white group-hover:scale-110 transition-transform" />
+              <h2 className="text-2xl font-semibold text-white">Générer un QR Code</h2>
+              <p className="text-gray-300 text-center">
+                Créez des QR codes personnalisés pour vos liens, contacts et plus encore
+              </p>
+            </div>
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 opacity-0 group-hover:opacity-10 transition-opacity" />
+          </Link>
 
-        {qrCode && (
-          <QRCodeDisplay
-            qrCode={qrCode}
-            onDownload={handleDownload}
-            onShare={handleShare}
-          />
-        )}
+          <Link
+            href="/scan"
+            className="group relative bg-white/10 hover:bg-white/20 backdrop-blur-lg rounded-2xl p-6 transition-all duration-300 border border-white/20 hover:border-white/40"
+          >
+            <div className="flex flex-col items-center gap-4">
+              <ViewfinderCircleIcon className="w-16 h-16 text-white group-hover:scale-110 transition-transform" />
+              <h2 className="text-2xl font-semibold text-white">Scanner un QR Code</h2>
+              <p className="text-gray-300 text-center">
+                Scannez n'importe quel QR code avec votre caméra ou depuis une image
+              </p>
+            </div>
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 opacity-0 group-hover:opacity-10 transition-opacity" />
+          </Link>
+        </div>
 
-        <QRCodeHistory
-          history={history}
-          onDownload={handleDownload}
-          onShare={handleShare}
-        />
-
-      <ScanButton />
+        {/* Bouton Historique */}
+        <Link
+          href="/history"
+          className="mt-8 group flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-lg rounded-full px-6 py-3 transition-all duration-300 border border-white/20 hover:border-white/40"
+        >
+          <ClockIcon className="w-5 h-5 text-white" />
+          <span className="text-white font-medium">Voir l'historique</span>
+        </Link>
       </div>
-      <Toaster position="bottom-right" />
     </main>
   );
 }
