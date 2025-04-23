@@ -6,6 +6,7 @@ import QRCodeGenerator from '@/components/QRCodeGenerator';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
 import QRCodeHistory from '@/components/QRCodeHistory';
 import ThemeToggle from '@/components/ThemeToggle';
+import ScanButton from '@/components/ScanButton';
 
 interface QRCodeData {
   text: string;
@@ -125,9 +126,12 @@ export default function Home() {
     <main className="min-h-screen p-4 md:p-8 bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-800">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-            Générateur de QR Code
-          </h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+              Générateur de QR Code
+            </h1>
+            
+          </div>
           <ThemeToggle />
         </div>
 
@@ -146,6 +150,8 @@ export default function Home() {
           onDownload={handleDownload}
           onShare={handleShare}
         />
+
+      <ScanButton />
       </div>
       <Toaster position="bottom-right" />
     </main>
