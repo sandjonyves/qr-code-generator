@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
 import toast from 'react-hot-toast';
 
 const QRScannerNew: React.FC = () => {
@@ -55,27 +55,27 @@ const QRScannerNew: React.FC = () => {
     }
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          if (scannerRef.current) {
-            scannerRef.current.scanFile(file, true)
-              .then(decodedText => {
-                onScanSuccess(decodedText);
-              })
-              .catch(err => {
-                toast.error('Erreur lors de la lecture du QR code');
-                console.error(err);
-              });
-          }
-        };
-        img.src = e.target?.result as string;
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    try {
+      // Créer une nouvelle instance de Html5Qrcode (pas Html5QrcodeScanner)
+      const html5QrCode = new Html5Qrcode("qr-reader-file");
+      
+      try {
+        const result = await html5QrCode.scanFile(file, /* verbose= */ false);
+        onScanSuccess(result);
+      } catch (err) {
+        toast.error('Erreur lors de la lecture du QR code');
+        console.error('Error scanning file:', err);
+      } finally {
+        // Nettoyer l'instance
+        html5QrCode.clear();
+      }
+    } catch (err) {
+      toast.error('Erreur lors de l\'initialisation du scanner');
+      console.error('Error initializing scanner:', err);
     }
   };
 
@@ -88,18 +88,18 @@ const QRScannerNew: React.FC = () => {
       <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Scanner QR Code</h2>
       
       <div className="flex gap-4 mb-4">
-        {/* <button
+        <button
           onClick={toggleCamera}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           {isCameraActive ? 'Désactiver Caméra' : 'Activer Caméra'}
-        </button> */}
-        {/* <button
+        </button>
+        <button
           onClick={() => fileInputRef.current?.click()}
           className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
         >
           Capturer QR Code
-        </button> */}
+        </button>
         <input
           type="file"
           ref={fileInputRef}
@@ -110,6 +110,7 @@ const QRScannerNew: React.FC = () => {
       </div>
 
       <div id="qr-reader" className="w-full aspect-square relative bg-black rounded-lg overflow-hidden" />
+      <div id="qr-reader-file" className="hidden" />
 
       {scannedData && !isUrl(scannedData) && (
         <div className="mt-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md w-full">
